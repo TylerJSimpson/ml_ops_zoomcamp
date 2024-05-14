@@ -83,3 +83,10 @@ Test that Docker is working without sudo:
 ```bash
 docker run hello-world
 ```
+
+## Preparing Model
+
+### Getting Data
+
+All data is listed here:
+https://github.com/DataTalksClub/nyc-tlc-data/releases/tag/green
