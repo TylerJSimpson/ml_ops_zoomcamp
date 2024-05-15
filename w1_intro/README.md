@@ -90,3 +90,24 @@ docker run hello-world
 
 All data is listed here:
 https://github.com/DataTalksClub/nyc-tlc-data/releases/tag/green
+
+Get January and February 2021 data from the above link:
+```bash
+wget https://github.com/DataTalksClub/nyc-tlc-data/releases/download/green/green_tripdata_2021-01.csv.gz
+wget https://github.com/DataTalksClub/nyc-tlc-data/releases/download/green/green_tripdata_2021-02.csv.gz
+```
+
+Unzip the .gz:
+```bash
+gunzip green_tripdata_2021-01.csv.gz
+gunzip green_tripdata_2021-02.csv.gz
+```
+
+### EDA and Model Development
+
+This is done in Jupyter Notebook:
+```bash
+jupyter notebook
+```
+
+Follow along in the corresponding [notebook](https://github.com/TylerJSimpson/ml_ops_zoomcamp/tree/main/notebooks/w1_duration-prediction.ipynb)
