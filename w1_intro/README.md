@@ -110,4 +110,4 @@ This is done in Jupyter Notebook:
 jupyter notebook
 ```
 
-Follow along in the corresponding [notebook](https://github.com/TylerJSimpson/ml_ops_zoomcamp/tree/main/notebooks/w1_duration-prediction.ipynb)
+Follow along in the corresponding [notebook](https://github.com/TylerJSimpson/ml_ops_zoomcamp/tree/master/notebooks/w1_duration-prediction.ipynb)
