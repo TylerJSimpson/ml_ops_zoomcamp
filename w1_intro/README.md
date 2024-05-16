@@ -111,3 +111,22 @@ jupyter notebook
 ```
 
 Follow along in the corresponding [notebook](https://github.com/TylerJSimpson/ml_ops_zoomcamp/tree/master/notebooks/w1_duration-prediction.ipynb)
+
+The model developed in the [notebook](https://github.com/TylerJSimpson/ml_ops_zoomcamp/tree/master/notebooks/w1_duration-prediction.ipynb) was exported to a [model](https://github.com/TylerJSimpson/ml_ops_zoomcamp/tree/master/models/lin_reg.bin)
+
+
+There are a few issues with our basic notebook. Note that we are using a basic model because the purpose of this course is ML ops not necessarily the model itself. 
+
+1. We tested both Lasso and Ridge Linear Regression with multiple alpha values. This history is lost by the nature of the notebook. We could have kept track of the models but we did not. Logging the lr outputs with an experiment tracker would have been optimal.
+
+2. When using our `with open() as f_out` to save the model we should have used a model registry to track and save models such as MLFlow. We will review this in [week 2](https://github.com/TylerJSimpson/ml_ops_zoomcamp/tree/master/w2_experiment_tracking).
+
+3. We already put many cells into a function but we should have parameterized the input data so we could pick different dates easily. We review the rules and best practices of these ML Pipelines in [week 3](https://github.com/TylerJSimpson/ml_ops_zoomcamp/tree/master/w3_orchestration).
+
+    Example workflow/ML pipeline:
+
+    1. Load & prepare data
+    2. Vectorize
+    3. Train
+
+4. 
