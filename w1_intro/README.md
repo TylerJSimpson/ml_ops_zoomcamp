@@ -114,6 +114,7 @@ Follow along in the corresponding [notebook](https://github.com/TylerJSimpson/ml
 
 The model developed in the [notebook](https://github.com/TylerJSimpson/ml_ops_zoomcamp/tree/master/notebooks/w1_duration-prediction.ipynb) was exported to a [model](https://github.com/TylerJSimpson/ml_ops_zoomcamp/tree/master/models/lin_reg.bin)
 
+## Model Overview
 
 There are a few issues with our basic notebook. Note that we are using a basic model because the purpose of this course is ML ops not necessarily the model itself. 
 
@@ -129,4 +130,56 @@ There are a few issues with our basic notebook. Note that we are using a basic m
     2. Vectorize
     3. Train
 
-4. 
+4. Further, we need to consider deployment of the model. We review this in [week 4](https://github.com/TylerJSimpson/ml_ops_zoomcamp/tree/master/w4_deployment).
+
+5. Once the model is deployed and in use we need to continue to monitor the model. This will be covered in [week 5](https://github.com/TylerJSimpson/ml_ops_zoomcamp/tree/master/w5_monitoring).
+
+## Maturity Model
+
+The highest level of ML Ops maturity involves all of the steps from the previous Model Overview section and automates each.  
+
+Microsoft has created an [ML Ops maturity model](https://learn.microsoft.com/en-us/azure/architecture/ai-ml/guide/mlops-maturity-model) which has 5 levels of automation.
+
+
+### Level 0: no ML Ops
+- no automation
+- all code in jupyter notebooks
+
+Usually a solo data scientist without an engineering team. 
+
+This is fine for proof of concept level but not production.
+
+### Level 1: DevOps, no ML Ops
+- releases are automated
+- CI/CD
+- unit & integration tests
+- Ops metrics
+
+Likely experienced developers using engineering/devops practices supporting a data scientist but they are operating separately in silos.
+
+Usually can deploy a model similar to how you would other code, i.e. automated releases, CICD, unit testing. 
+
+No experiment tracking and ML specific operations.
+
+This maturity level can move from POC to production and work okay.
+
+### Level 2: automated training
+- training pipeline
+- experiment tracking
+- model registry
+- low friction deployment
+
+Usually data scientist and engineers are working together and a part of the same team.
+
+Investing in this sort of infrastructure makes sense when you have multiple models in production. It may be too early to get to this maturity level if you are handling only 1-2 models in production.
+
+### Level 3: automated deployment
+- easy to deploy model
+- A/B tests
+- model monitoring
+
+This makes sense when you have 2-3 mature use cases or perhaps 5+ standard use cases.
+
+### Level 4: full ML Ops automation
+
+Can automatically see models are drifting, trigger training, and deploying of the new model.
