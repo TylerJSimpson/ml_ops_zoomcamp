@@ -183,3 +183,19 @@ This makes sense when you have 2-3 mature use cases or perhaps 5+ standard use c
 ### Level 4: full ML Ops automation
 
 Can automatically see models are drifting, trigger training, and deploying of the new model.
+
+## Homework
+
+Get January and February 2023 yellow taxi data for the homework:
+```bash
+wget https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2023-01.parquet
+wget https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2023-02.parquet
+```
+
+Unzip the .gz:
+```bash
+gunzip green_tripdata_2021-01.csv.gz
+gunzip green_tripdata_2021-02.csv.gz
+```
+
+Week 1 homework can be found [here](https://github.com/TylerJSimpson/ml_ops_zoomcamp/tree/master/w1_into/w1_homework.ipynb)
