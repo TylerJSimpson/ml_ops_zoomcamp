@@ -115,11 +115,11 @@ with mlflow.start_run():
     mlflow.log_metric("rmse", rmse)
 ```
 
-The new notebook can be found [here](https://github.com/TylerJSimpson/ml_ops_zoomcamp/tree/master/w2_experiment_tracking/w1_duration-prediction.ipynb).
+The new notebook can be found [here](https://github.com/TylerJSimpson/ml_ops_zoomcamp/tree/master/w1_intro/notebooks/w2_duration-prediction.ipynb).
 
 ### Experiment Tracking with MLflow
 
-We will be adding an additional experiment to the [notebook](https://github.com/TylerJSimpson/ml_ops_zoomcamp/tree/master/w2_experiment_tracking/w1_duration-prediction.ipynb). Key portions of the notebook will be listed below as they are added to the notebook.
+We will be adding an additional experiment to the [notebook](https://github.com/TylerJSimpson/ml_ops_zoomcamp/tree/master/w2_experiment_tracking/notebooks/w2_duration-prediction.ipynb). Key portions of the notebook will be listed below as they are added to the notebook.
 
 This is the code that was added to the notebook with notes:
 ```python
@@ -259,6 +259,8 @@ with open('../models/lin_reg.bin', 'wb') as f_out:
 Using MLflow we can log these artifacts and others can download them directly from MLflow UI:
 
 ```python
+mlflow.xgboost.autolog(disable=True)
+
 with mlflow.start_run():
     
     #using same params as previously
@@ -286,15 +288,54 @@ with mlflow.start_run():
     rmse = mean_squared_error(y_val, y_pred, squared=False)
     mlflow.log_metric("rmse", rmse)
 
+    # Pull out the pre-processing so that it is saved in MLflow model management
+    with open("models/preprocessors.b", "wb") as f_out:
+        pickle.dump(dv, f_out)
+    mlflow.log_artifact("models/preprocessor.b", artifact_path="preprocessor")
 
     mlflow.xgboost.log_model(booster, artifact_path="w2_models_mlflow")
 ```
 
-Note most of the code above was copied from before. The important portion is here:  
-`mlflow.xgboost.log_model(booster, artifact_path="w2_models_mlflow")`
-
-There is a lot of useful information. Below you can see the MLmodel overview. Notice it links even to the conda.yaml which shows necessary environment packages.
-
+Note most of the code above was copied from before. The important portions:
+- `mlflow.xgboost.log_model(booster, artifact_path="w2_models_mlflow")`
+    - this portion allows the logging of the artifacts making this reproducible.
+- `mlflow.log_artifact("models/preprocessor.b", artifact_path="preprocessor")`
+    - this portion logs the data preprocessing as an artifact
 
 ![w2_image4](https://github.com/TylerJSimpson/ml_ops_zoomcamp/tree/master/images/w2_image4.png)
 
+If you don't use anaconda you can still see the dependencies in `requirements.txt`.
+
+### Making a prediction
+
+We have covered adding experiments to MLflow but now it is important to cover using them to make predictions.
+
+From the documentation:
+
+Predict with Spark DataFrame:
+```python
+import mlflow
+logged_model = 'runs:/{runid}/models_mlflow'
+
+# Load model into spark UDF
+loaded_model = mlflow.pyfunc.spark_udf(spark, model_uri=logged_model, result_type='double')
+
+# Predict on Spark DataFrame
+columns = list(df.columns)
+df.withColumn('predictions', loaded_model(*columns)).collect()
+
+```
+
+Predict with Pandas DataFrame:
+```python
+import mlflow
+logged_model = 'runs:/{runid}/models_mlflow'
+
+# Load model as PyFuncModel
+loaded_model = mlflow.pyfunc.load_model(logged_model)
+
+# Predict on a Pandas DataFrame
+import pandas as pd
+loaded_model.predict(pd.DataFrame(data))
+
+```
