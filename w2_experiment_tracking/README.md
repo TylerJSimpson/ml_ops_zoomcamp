@@ -191,13 +191,13 @@ Notice I have chosen 3 of the parameters to evaluate against the rmse metric.
 
 You can see circled I clicked a portion of the rmse to filter by which clearly shows that there is a correlation with low min_child_weight corresponding to low rmse but not so much for max_depth. This is a powerful exploratory tool. 
 
-![w2_image1](https://github.com/TylerJSimpson/ml_ops_zoomcamp/tree/master/images/w2_image1.png)
+![w2_image1](../images/w2_image1.png)
 
 Let's take a look at both of these parameters vs the rmse in a scatter plot. This will show you a clear correlation with min_child_weight as opposed to no clear correlation with max_depth.
 
-![w2_image2](https://github.com/TylerJSimpson/ml_ops_zoomcamp/tree/master/images/w2_image2.png)
+![w2_image2](../images/w2_image2.png)
 
-![w2_image3](https://github.com/TylerJSimpson/ml_ops_zoomcamp/tree/master/images/w2_image3.png)
+![w2_image3](../images/w2_image3.png)
 
 Since we are using one of the approved models listed in the docs https://mlflow.org/docs/latest/tracking/autolog.html we can use auto logging.
 
@@ -302,7 +302,7 @@ Note most of the code above was copied from before. The important portions:
 - `mlflow.log_artifact("models/preprocessor.b", artifact_path="preprocessor")`
     - this portion logs the data preprocessing as an artifact
 
-![w2_image4](https://github.com/TylerJSimpson/ml_ops_zoomcamp/tree/master/images/w2_image4.png)
+![w2_image4](../images/w2_image4.png)
 
 If you don't use anaconda you can still see the dependencies in `requirements.txt`.
 
@@ -339,3 +339,136 @@ import pandas as pd
 loaded_model.predict(pd.DataFrame(data))
 
 ```
+
+### Model Registry
+
+#### UI
+
+Previously we have looked at logging experiment data such as models, metrics, parameters, and artifacts.
+
+If you were to decide some of these are ready for production, you would then register the model into the model registry.
+
+Previously we have been looking at the `Experiments` tab of the MLflow UI and now we will look at the `Models` tab. 
+
+When clicking an Experiment you will notice in the top right corner there is a `Register Model` button. If you have not yet created a model you will need to create one.
+
+Now you can see the model in the `Models` tab. 
+
+If you register more Experiments to this Model you will add incrementing versions.
+
+You can add a description as well as tags for easy searching.
+
+Previously there was a `None` to `Staging` to `Production` to `Archived` promotion stage. This has been deprecated and now a more flexible Alias/Tag system can be used for environment management.
+
+#### Notebook
+
+At this point I would like to mention that when you run mlflow ui for example:
+```bash
+ mlflow ui --backend-store-uri sqlite:///mlflow.db --port 5001
+```
+You have to run it from the right path so if you are creating objects via the client in a notebook make sure you had the path right and it is not writing to a different mlflow instance.
+
+Notes are in the [notebook](https://github.com/TylerJSimpson/ml_ops_zoomcamp/tree/master/w2_experiment_tracking/notebooks/w2_duration-prediction.ipynb) but some will be posted below in the readme.
+
+First we want to import packages and set the client
+```python
+# Import packages set client
+
+import mlflow
+from mlflow import MlflowClient
+from mlflow.entities import ViewType
+
+# IMPORTANT: note the relative path if I just did `sqlite:///mlflow.db` it would create a new MLflow instance not connect to the already made one
+MLFLOW_TRACKING_URI = "sqlite:///../mlflow.db"
+
+client = MlflowClient(tracking_uri=MLFLOW_TRACKING_URI)
+```
+
+Creating an experiment:
+```python
+# Create an experiment
+client.create_experiment(name="experiment-from-notebook")
+```
+
+Show experiment IDs:
+```python
+# Show experiment IDs
+client.search_experiments()
+```
+
+Search experiment runs:
+```python
+# Search experiment runs from our previous experiment
+runs = client.search_runs(
+    experiment_ids="1",
+    filter_string="metrics.rmse < 6.5",
+    run_view_type=ViewType.ACTIVE_ONLY,
+    max_results=10,
+    order_by=["metrics.rmse ASC"],
+)
+```
+
+Print specific features of runs in an easy-to-read format:
+```python
+# Show runs in an easier to read format
+for run in runs:
+    print(f"run id: {run.info.run_id}, rmse: {run.data.metrics['rmse']:.4f}")
+```
+
+Register a model with the model ID:
+```python
+# Register a model using the run id
+
+mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+
+run_id = "2d7b381c344b4038a3dda7f3ce453c40" # Grabbing run id from previous output
+model_uri = f"runs:/{run_id}/model"
+mlflow.register_model(model_uri=model_uri, name="nyc-taxi-experiment-notebook")
+
+# Each time this is run a new version will be created of the registered model
+```
+
+Get model version and aliases:
+```python
+# Get model versions and aliases (stages being deprecated)
+
+model_name="nyc-taxi-experiment-notebook"
+latest_versions = client.search_model_versions()
+
+for version in latest_versions:
+    print(f"version: {version.version}, aliases: {version.aliases}")
+```
+
+Update the model version/description:
+```python
+# Update model version/description
+
+from datetime import datetime
+date = datetime.today().date()
+model_version = 4
+
+client.update_model_version(
+    name=model_name,
+    version=model_version,
+    description=f"The model version {model_version} was updated on {date}"
+)
+```
+
+### MLflow in practice
+
+Note that we have been using a local MLflow instance. This is appropriate for a single data scientist. If there are multiple data scientists working together you will likely need to host the MLflow instance remotely.
+
+There are 3 different categories to consider when configuring MLflow:
+
+- Backend store
+    - local filesystem
+    - SQLAlchemy compatible DB (e.g. SQLite)
+
+- Artifacts store
+    - local filesystem
+    - remote (e.g. s3 bucket)
+
+- Tracking server
+    - no tracking server
+    - localhost
+    - remote
