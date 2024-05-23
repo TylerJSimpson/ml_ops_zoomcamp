@@ -472,3 +472,28 @@ There are 3 different categories to consider when configuring MLflow:
     - no tracking server
     - localhost
     - remote
+
+The scenario in which you are using MLflow will determine how you configure these categories.
+
+**[Scenario 1 Notebook](https://github.com/TylerJSimpson/ml_ops_zoomcamp/tree/master/w2_experiment_tracking/scenarios/scenario-1.ipynb)** - single data scientist participating in an ML competition
+
+**[Scenario 2 Notebook](https://github.com/TylerJSimpson/ml_ops_zoomcamp/tree/master/w2_experiment_tracking/scenarios/scenario-2.ipynb)** - cross-functional team with one data scientist working on an ML model
+
+**[Scenario 3 Notebook](https://github.com/TylerJSimpson/ml_ops_zoomcamp/tree/master/w2_experiment_tracking/scenarios/scenario-3.ipynb)** - multiple data scientists working on multiple ML models
+
+
+#### Potential issues
+
+1. Access to the server running MLflow should have a VPN
+2. If MLflow is company scale you may want to look at something like AWS Fargate
+3. Define a standard for naming experiments, models, default tags
+4. Restrict access to artifacts
+5. Mlflow open source version does not provide authentication capabilities
+6. Data versioning capability is not supported out of the box
+7. Model/Data monitoring and alerting is not a feature of MLflow and another service must be used
+
+#### MLflow alternatives
+
+1. Neptune
+2. Comet
+3. Weights & Biases
