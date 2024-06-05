@@ -2,22 +2,24 @@
 
 ## Pre-requisites
 
-1. Clone the pre-made Mage data pipeline repository
+1. Install requirements
 ```bash
-git clone https://github.com/mage-ai/mlops.git
+pip install -U prefect
 ```
 
-2. Move into the cloned repository and run the .sh script launching Mage and PostrgeSQL
+2. Start local Prefect server
 ```bash
-cd mlops
-. /scripts/start.sh
+prefect server start
 ```
+
+Default URL:
+`127.0.0.1:4200/dashboard`
 
 ## Introduction
 
 ### MLOps involves 4 steps
 
-1. Preparing the modelf or deployment involves optimizing performance, ensuring it handles real-world data, and packaging it for integration into existing systems.
+1. Preparing the model or deployment involves optimizing performance, ensuring it handles real-world data, and packaging it for integration into existing systems.
 
 2. Deploying the model involves moving it from development to production, making it accessible to users and applications.
 
@@ -43,377 +45,124 @@ cd mlops
 
     MLOps streamlines the ML lifecycle, enabling organizations to successfully deploy more projects to production and derive tangible business value and ROI from AI/ML investments at scale.
 
-## Mage
+## Prefect Overview
 
 ### Introduction
 
-We are using Mage, a data orchestration tool, to help enable steps of the MLOps lifecycle.
+Prefect allows you to orchestrate and observe your python workflows at scale.
 
-1. Data preparation
+It is a flexible open-source Python framework to turn standard pipelines into fault-tolerant dataflows.
 
-    Mage offers features to build, run, and manage data pipelines for data transformation and integration, including pipeline orchestration, notebook environments, data integrations, and strreaming pipelines for real-time data.
+When self hosting a Prefect server you have an `Orchestration API` that is a rest API that handles the metadata. The metadata is stored in a data base `sqlite` is the default.
 
-2. Training and deployment
+### Terminology
 
-    Mage helps prepare data, train machine learning models, and deploy them with accessible API endpoints.
+* `tast` - a discrete unit of work in a Prefect workflow, consider this a regular python function
+* `Flow` - serves as the container for workflow logic, consider this as the main python function that calls the others
+* `Subflow` - `Flow` called by another `Flow`
 
-3. Standardize complex processes
+## Prefect Operations
 
-    Mage simplifies MLOps by providing a unified platform for data pipelining, model development, deployment, versioning, CI/CD, and maintenance, allowing developers to focus on model creation while improving efficiency and collaboration.
+### File Setup
 
-If you followed the pre-requisites Mage should be running and can be accessed via the default port 6789: 
+We took the original notebook `duration_prediction_original.ipynb` and added some exploration and saved it as `duration_prediction_explore.ipynb`.
 
-`http://localhost:6789`
+We then work on converting this notebook to a python script in `orchestrate_pre_prefect.py`.
 
-Navigate to the pipelines and run `example_pipeline`
+Finally we add our Prefect code which can be seen in the script `orchestrate.py`
 
-### Mage Basics
+All we need to do is add decorators notice the addition of either `@task` or `@flow` decorators. 
 
-#### Creating a new project and pipeline
+There are some other specifications you can call in the decorators including:
+* retries (int)
+* retry_delay_seconds (int)
+* log_prints (bool)
 
-Open your Mage UI
+### Projects
 
-1. Open `text editor`
-2. Right click directory and select `New Mage project` and name it i.e. `unit_1_data_preparation`
-3. Register the project in `Settings` and select as `Currently selected project` 
-4. Switch to the project in the top right i.e. ` mlops > unit_1_data_preparation`
-5. In the `Overview` tab Select `New pipeline` in this case we name it `Data preparation`
-
-#### Creating ingest block
-
-Make sure you are in the previously created pipeline
-
-1. Select `All blocks` then `Data loader` then `Base tepmlate` in this case we name it `ingest`
-
-2. Add desired code
-
-Adding the following code:
-```python
-import requests
-from io import BytesIO
-from typing import List
-
-import pandas as pd
-
-if 'data_loader' not in globals():
-    from mage_ai.data_preparation.decorators import data_loader
-
-
-@data_loader
-def ingest_files(**kwargs) -> pd.DataFrame:
-    dfs: List[pd.DataFrame] = []
-
-    for year, months in [(2024, (1, 3))]:
-        for i in range(*months):
-            response = requests.get(
-                'https://github.com/mage-ai/datasets/raw/master/taxi/green'
-                f'/{year}/{i:02d}.parquet'
-            )
-
-            if response.status_code != 200:
-                raise Exception(response.text)
-
-            df = pd.read_parquet(BytesIO(response.content))
-            dfs.append(df)
-
-    return pd.concat(dfs)
+To initialize a project:
+```bash
+prefect project init
 ```
 
-3. Explore the data by selecting the `Charts` button ont he top right of the block.
+This will create:
+* `.prefectignore`
+* `deployment.yaml`: useful for templating/making multiple deployments
+* `prefect.yaml`: 
+* `.prefect/`: hidden folder for short hand convenience
 
-#### Creating utility functions
+Running `prefect project init` will not overwrite these files they will need to be deleted then re-created.
 
-1. Open `text editor` and create `New file` or `New folder` in our case we create both at once via `New file` named `utils/data_preparation/cleaning.py`
-    - `utils/data_preparation/cleaning.py`
-    - `utils/data_preparation/feature_engineering`
-    - `utils/data_preparation/feature_selector`
-    - `utils/data_preparation/splitters`
-    - `utils/data_preparation/__init__.py`
+#### .yaml
 
-In our case we are using the below code for each function.
+`name` will be pulled from the folder name the project was initialized in.
+`prefect-version` will come from the python version you are running.
+`build` is used when working with docker images.
+`push` is used when working with remote locations such as Azure/AWS.
+`pull` shows the git repository and branch that the code will be pulled from.
 
-cleaning.py
-```python
-import pandas as pd
+#### Workers
 
+Now we need to assign a worker.
 
-def clean(
-    df: pd.DataFrame,
-    include_extreme_durations: bool = False,
-) -> pd.DataFrame:
-    # Convert pickup and dropoff datetime columns to datetime type
-    df.lpep_dropoff_datetime = pd.to_datetime(df.lpep_dropoff_datetime)
-    df.lpep_pickup_datetime = pd.to_datetime(df.lpep_pickup_datetime)
+This can be done in the UI via `Work Pools` then in this case `default agent`. We have named ours `zoompool`.
 
-    # Calculate the trip duration in minutes
-    df['duration'] = df.lpep_dropoff_datetime - df.lpep_pickup_datetime
-    df.duration = df.duration.apply(lambda td: td.total_seconds() / 60)
+#### Starting a worker
 
-    if not include_extreme_durations:
-        # Filter out trips that are less than 1 minute or more than 60 minutes
-        df = df[(df.duration >= 1) & (df.duration <= 60)]
+prefect worker start is used for non prefect agent workers.
 
-    # Convert location IDs to string to treat them as categorical features
-    categorical = ['PULocationID', 'DOLocationID']
-    df[categorical] = df[categorical].astype(str)
-
-    return df
+```bash
+prefect agent start --pool 'zoompool'
 ```
 
-feature_engineering.py
-```python
-from typing import Dict, List, Union
+#### Deploy flow
 
-from pandas import DataFrame
+Specify file, main flow, name it and specify the worker pool:
+```bash
+prefect deploy 3.4/orchestrate.py:main_flow -n taxi1 -p zoompool
+```
+Note that if you specify something wrong like the worker pool or the pool is not already running, Prefect will prompt you through creating a work pool in the CLI.
 
+#### Creating blocks
 
-def combine_features(df: Union[List[Dict], DataFrame]) -> Union[List[Dict], DataFrame]:
-    if isinstance(df, DataFrame):
-        df['PU_DO'] = df['PULocationID'].astype(str) + '_' + df['DOLocationID'].astype(str)
-    elif isinstance(df, list) and len(df) >= 1 and isinstance(df[0], dict):
-        arr = []
-        for row in df:
-            row['PU_DO'] = str(row['PULocationID']) + '_' + str(row['DOLocationID'])
-            arr.append(row)
-        return arr
-    return df
+Blocks can be created in the UI or with .py files.
+
+Note that depending on what system/API you are interacting with you will need to install the supporting packages.
+
+Azure:
+```bash
+pip install prefect-azure
 ```
 
-feature_selector.py
-```python
-from typing import List, Optional
-
-import pandas as pd
-
-CATEGORICAL_FEATURES = ['PU_DO']
-NUMERICAL_FEATURES = ['trip_distance']
-
-
-def select_features(df: pd.DataFrame, features: Optional[List[str]] = None) -> pd.DataFrame:
-    columns = CATEGORICAL_FEATURES + NUMERICAL_FEATURES
-    if features:
-        columns += features
-
-    return df[columns]
+AWS:
+```bash
+pip install prefect-aws
 ```
 
-splitters.py
+In `3.5/create_s3_bucket_block.py` you can see example of creating blocks via code.
+
 ```python
-from typing import List, Tuple, Union
-
-from pandas import DataFrame, Index
-
-
-def split_on_value(
-    df: DataFrame,
-    feature: str,
-    value: Union[float, int, str],
-    drop_feature: bool = True,
-    return_indexes: bool = False,
-) -> Union[Tuple[DataFrame, DataFrame], Tuple[Index, Index]]:
-    df_train = df[df[feature] < value]
-    df_val = df[df[feature] >= value]
-
-    if return_indexes:
-        return df_train.index, df_val.index
-
-    if drop_feature:
-        df_train = df_train.drop(columns=[feature])
-        df_val = df_val.drop(columns=[feature])
-
-    return df_train, df_val
-```
-
-#### Adding block to utilize utility functions
-
-1. Navigate to the pipeline we created `unit_1_data_preparation/pipelines/data_preparation` and enter `edit` mode.
-2. Scroll down and select `All blocks` then `Transformer` then `Base template` and name it `preparing`.
-3. Add your code.
-
-preparing.py:
-```python
-from typing import Tuple
-
-import pandas as pd
-
-from mlops.utils.data_preparation.cleaning import clean
-from mlops.utils.data_preparation.feature_engineering import combine_features
-from mlops.utils.data_preparation.feature_selector import select_features
-from mlops.utils.data_preparation.splitters import split_on_value
-
-if 'transformer' not in globals():
-    from mage_ai.data_preparation.decorators import transformer
+from time import sleep
+from prefect_aws import S3Bucket, AwsCredentials
 
 
-@transformer
-def transform(
-    df: pd.DataFrame, **kwargs
-) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    split_on_feature = kwargs.get('split_on_feature')
-    split_on_feature_value = kwargs.get('split_on_feature_value')
-    target = kwargs.get('target')
-
-    df = clean(df)
-    df = combine_features(df)
-    df = select_features(df, features=[split_on_feature, target])
-
-    df_train, df_val = split_on_value(
-        df,
-        split_on_feature,
-        split_on_feature_value,
+def create_aws_creds_block():
+    my_aws_creds_obj = AwsCredentials(
+        aws_access_key_id="123abc", aws_secret_access_key="abc123"
     )
-
-    return df, df_train, df_val
-```
-
-4. Notice in our code we use variables `split_on_feature`, `split_on_feature_value`, and `target` to make it reusable. You will want to set the default values in the `Global variables` settings which can be accessed on the panel on the right.
-    - `split_on_feature`: lpep_pickup_datetime
-    - `split_on_feature_value`: 2024-02-01
-    - `target`: duration
-5. Run the pipeline
-
-#### Adding encoders
-
-1. create file `utils/data_preparation/encoders.py`
-
-encoders.py
-```python
-from typing import Dict, List, Optional, Tuple
-
-import pandas as pd
-import scipy
-from sklearn.feature_extraction import DictVectorizer
+    my_aws_creds_obj.save(name="my-aws-creds", overwrite=True)
 
 
-def vectorize_features(
-    training_set: pd.DataFrame,
-    validation_set: Optional[pd.DataFrame] = None,
-) -> Tuple[scipy.sparse.csr_matrix, scipy.sparse.csr_matrix, DictVectorizer]:
-    dv = DictVectorizer()
-
-    train_dicts = training_set.to_dict(orient='records')
-    X_train = dv.fit_transform(train_dicts)
-
-    X_val = None
-    if validation_set is not None:
-        val_dicts = validation_set[training_set.columns].to_dict(orient='records')
-        X_val = dv.transform(val_dicts)
-
-    return X_train, X_val, dv
-
-```
-
-#### Creating build block
-
-1. Add a 3rd step to our pipeline `unit_1_data_preparation/pipelines/data_preparation/` by selecting `Data exporter` then `Base template` and name is `build` in our case.
-2. Add your code
-
-build.py
-```python
-from typing import List, Tuple
-
-from pandas import DataFrame, Series
-from scipy.sparse._csr import csr_matrix
-from sklearn.base import BaseEstimator
-
-from mlops.utils.data_preparation.encoders import vectorize_features
-from mlops.utils.data_preparation.feature_selector import select_features
-
-if 'data_exporter' not in globals():
-    from mage_ai.data_preparation.decorators import data_exporter
-if 'test' not in globals():
-    from mage_ai.data_preparation.decorators import test
-
-
-@data_exporter
-def export(
-    data: Tuple[DataFrame, DataFrame, DataFrame], *args, **kwargs
-) -> Tuple[
-    csr_matrix,
-    csr_matrix,
-    csr_matrix,
-    Series,
-    Series,
-    Series,
-    BaseEstimator,
-]:
-    df, df_train, df_val = data
-    target = kwargs.get('target', 'duration')
-
-    X, _, _ = vectorize_features(select_features(df))
-    y: Series = df[target]
-
-    X_train, X_val, dv = vectorize_features(
-        select_features(df_train),
-        select_features(df_val),
+def create_s3_bucket_block():
+    aws_creds = AwsCredentials.load("my-aws-creds")
+    my_s3_bucket_obj = S3Bucket(
+        bucket_name="my-first-bucket-abc", credentials=aws_creds
     )
-    y_train = df_train[target]
-    y_val = df_val[target]
-
-    return X, X_train, X_val, y, y_train, y_val, dv
+    my_s3_bucket_obj.save(name="s3-bucket-example", overwrite=True)
 
 
-@test
-def test_dataset(
-    X: csr_matrix,
-    X_train: csr_matrix,
-    X_val: csr_matrix,
-    y: Series,
-    y_train: Series,
-    y_val: Series,
-    *args,
-) -> None:
-    assert (
-        X.shape[0] == 105870
-    ), f'Entire dataset should have 105870 examples, but has {X.shape[0]}'
-    assert (
-        X.shape[1] == 7027
-    ), f'Entire dataset should have 7027 features, but has {X.shape[1]}'
-    assert (
-        len(y.index) == X.shape[0]
-    ), f'Entire dataset should have {X.shape[0]} examples, but has {len(y.index)}'
-
-
-@test
-def test_training_set(
-    X: csr_matrix,
-    X_train: csr_matrix,
-    X_val: csr_matrix,
-    y: Series,
-    y_train: Series,
-    y_val: Series,
-    *args,
-) -> None:
-    assert (
-        X_train.shape[0] == 54378
-    ), f'Training set for training model should have 54378 examples, but has {X_train.shape[0]}'
-    assert (
-        X_train.shape[1] == 5094
-    ), f'Training set for training model should have 5094 features, but has {X_train.shape[1]}'
-    assert (
-        len(y_train.index) == X_train.shape[0]
-    ), f'Training set for training model should have {X_train.shape[0]} examples, but has {len(y_train.index)}'
-
-
-@test
-def test_validation_set(
-    X: csr_matrix,
-    X_train: csr_matrix,
-    X_val: csr_matrix,
-    y: Series,
-    y_train: Series,
-    y_val: Series,
-    *args,
-) -> None:
-    assert (
-        X_val.shape[0] == 51492
-    ), f'Training set for validation should have 51492 examples, but has {X_val.shape[0]}'
-    assert (
-        X_val.shape[1] == 5094
-    ), f'Training set for validation should have 5094 features, but has {X_val.shape[1]}'
-    assert (
-        len(y_val.index) == X_val.shape[0]
-    ), f'Training set for training model should have {X_val.shape[0]} examples, but has {len(y_val.index)}'
+if __name__ == "__main__":
+    create_aws_creds_block()
+    sleep(5)
+    create_s3_bucket_block()
 ```
-
-Note we also added test code in this block where you will see `X/X tests passed.` upon running.
