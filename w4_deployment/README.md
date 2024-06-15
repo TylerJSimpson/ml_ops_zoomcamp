@@ -63,3 +63,95 @@ pipenv shell
 Note that a `Pipfile` and `Pipfile.lock` were both created in your directory.
 
 ### Create script for predicting
+
+File `predict.py` contains the code for making the predictions.
+
+```python
+import pickle
+
+from flask import Flask, request, jsonify
+
+with open('lin_reg.bin', 'rb') as f_in:
+    (dv, model) = pickle.load(f_in)
+
+
+def prepare_features(ride):
+    features = {}
+    features['PU_DO'] = '%s_%s' % (ride['PULocationID'], ride['DOLocationID'])
+    features['trip_distance'] = ride['trip_distance']
+    return features
+
+
+def predict(features):
+    X = dv.transform(features)
+    preds = model.predict(X)
+    return float(preds[0])
+
+
+app = Flask('duration-prediction')
+
+
+@app.route('/predict', methods=['POST'])
+def predict_endpoint():
+    ride = request.get_json()
+
+    features = prepare_features(ride)
+    pred = predict(features)
+
+    result = {
+        'duration': pred
+    }
+
+    return jsonify(result)
+
+
+if __name__ == "__main__":
+    app.run(debug=True, host='0.0.0.0', port=9696)
+```
+
+File `test.py` contains the test input.
+
+```python
+import requests
+
+ride = {
+    "PULocationID": 10,
+    "DOLocationID": 50,
+    "trip_distance": 40
+}
+
+url = 'http://localhost:9696/predict'
+response = requests.post(url, json=ride)
+print(response.json())
+```
+
+Now, with the python environment activated, you can run the Flask app then send the test to it.
+
+```bash
+python predict.py
+python test.py
+```
+
+And you should get the return value `{'duration': 26.2158369001914}`
+
+Note you will be warned `WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.`
+
+To get rid of this you can switch to gunicorn
+
+Ensure gunicorn is installed
+
+```python
+pip install gunicorn
+```
+
+Instead of running `python predict.py` you can use gunicorn now to specify the same port and the file name.
+
+```bash
+gunicorn --bind=0.0.0.0:9696 predict:app
+```
+
+Then you can once again run the test to this application:
+```bash
+python test.py
+```
+Returning result `{'duration': 26.2158369001914}`
